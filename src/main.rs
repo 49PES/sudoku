@@ -11,32 +11,38 @@ struct Board {
 
 impl std::fmt::Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "—————————————————————————")?;
-        for i in 0..DIM {
-            for j in 0..DIM {
-                if j == 0 {
-                    write!(f, "| ")?;
+        for (i, j, v) in self.cells() {
+            if j == 0 {
+                writeln!(f)?;
+                if i % ORDER == 0 {
+                    writeln!(f, "—————————————————————————")?;
                 }
-                if let Some(v) = self.grid[i][j] {
-                    write!(f, "{} ", v)?;
-                } else {
-                    write!(f, "_ ")?;
-                }
-
-                if j % ORDER == ORDER - 1 {
-                    write!(f, "| ")?;
-                }
+                write!(f, "| ")?;
             }
-            writeln!(f)?;
 
-            if i % ORDER == ORDER - 1 {
-                writeln!(f, "—————————————————————————")?;
+            if let Some(v) = v {
+                write!(f, "{} ", v)?;
+            } else {
+                write!(f, "_ ")?;
+            }
+
+            if j % ORDER == ORDER - 1 {
+                write!(f, "| ")?;
             }
         }
+
+        writeln!(f)?;
+        writeln!(f, "—————————————————————————")?;
+
         Ok(())
     }
 }
 impl Board {
+    /// Iterator over the cells of the board
+    fn cells(&self) -> impl Iterator<Item = (usize, usize, Option<usize>)> + '_ {
+        (0..DIM).flat_map(move |row| (0..DIM).map(move |col| (row, col, self.grid[row][col])))
+    }
+
     /// Generate a permutation that preserves major and minor rows/cols
     /// (e.g. [0, 1, 2, 3, 4, 5, 6, 7, 8] -> [2, 1, 0, 6, 7, 8, 3, 4, 5])
     fn line_permutation() -> [usize; DIM] {
@@ -81,11 +87,8 @@ impl Board {
         let val_permutation = Board::value_permutation();
 
         let mut grid = [[None; DIM]; DIM];
-        for i in 0..DIM {
-            for j in 0..DIM {
-                grid[row_permutation[i]][col_permutation[j]] =
-                    self.grid[i][j].map(|v| val_permutation[v - 1]);
-            }
+        for (i, j, v) in self.cells() {
+            grid[row_permutation[i]][col_permutation[j]] = v.map(|v| val_permutation[v - 1]);
         }
         Board { grid }
     }
