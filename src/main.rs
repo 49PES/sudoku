@@ -9,6 +9,7 @@ struct Board {
     grid: [[Option<usize>; DIM]; DIM],
 }
 
+/// NOTE: Generalize this display method for values of ORDER that are not equal to 3
 impl std::fmt::Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, j, v) in self.cells() {
@@ -43,6 +44,13 @@ impl Board {
         (0..DIM).flat_map(move |row| (0..DIM).map(move |col| (row, col, self.grid[row][col])))
     }
 
+    fn get(&self, row: usize, col: usize) -> Option<usize> {
+        self.grid[row][col]
+    }
+
+    fn set(&mut self, row: usize, col: usize, value: Option<usize>) {
+        self.grid[row][col] = value;
+    }
     /// Generate a permutation that preserves major and minor rows/cols
     /// (e.g. [0, 1, 2, 3, 4, 5, 6, 7, 8] -> [2, 1, 0, 6, 7, 8, 3, 4, 5])
     fn line_permutation() -> [usize; DIM] {
@@ -92,6 +100,67 @@ impl Board {
         }
         Board { grid }
     }
+
+    fn valid_moves(&self, row: usize, col: usize) -> Vec<Option<usize>> {
+        let mut neighbors = [false; DIM];
+
+        // Check across the row and col and toggle accordingly
+        for i in 0..DIM {
+            if let Some(v) = self.get(row, i) {
+                neighbors[v - 1] = true;
+            }
+            if let Some(v) = self.get(i, col) {
+                neighbors[v - 1] = true;
+            }
+        }
+
+        // Round down towards the top-left corner of the sub-grid
+        let major_row = ORDER * (row / ORDER);
+        let major_col = ORDER * (col / ORDER);
+
+        for r in major_row..major_row + ORDER {
+            for c in major_col..major_col + ORDER {
+                if let Some(v) = self.get(r, c) {
+                    neighbors[v - 1] = true;
+                }
+            }
+        }
+
+        neighbors
+            .iter()
+            .enumerate()
+            .filter(|(_, &is_neighbor)| !is_neighbor)
+            .map(|(index, _)| Some(index + 1))
+            .collect()
+    }
+
+    fn solve(&mut self) -> bool {
+        self.solve_aux(0, 0)
+    }
+
+    fn solve_aux(&mut self, row: usize, col: usize) -> bool {
+        // Have reached below the board (board has been solved)
+        if row == DIM {
+            return true;
+        }
+        // Wrap-around
+        if col == DIM {
+            return self.solve_aux(row + 1, 0);
+        }
+        // Occupied cell, iterate forwards
+        if self.get(row, col).is_some() {
+            return self.solve_aux(row, col + 1);
+        }
+
+        for valid_move in self.valid_moves(row, col) {
+            self.set(row, col, valid_move);
+            if self.solve_aux(row, col + 1) {
+                return true;
+            }
+        }
+        self.set(row, col, None);
+        false
+    }
 }
 
 fn main() {
@@ -108,11 +177,14 @@ fn main() {
     ];
 
     let option_board = board_base.map(|row| row.map(|v| if v == 0 { None } else { Some(v) }));
-    let board = Board { grid: option_board };
+    let mut board = Board { grid: option_board };
 
-    println!("{}", board);
-    println!("{}", board.permute());
-    println!("{}", board.permute());
-    println!("{}", board.permute());
-    println!("{}", board);
+    let mut generated_board = board.permute();
+    println!("Original board: {}", board);
+    println!("Generated board: {}", generated_board);
+
+    board.solve();
+    generated_board.solve();
+    println!("Original board solved: {}", board);
+    println!("Generated board solved: {}", generated_board);
 }
